@@ -1,0 +1,12 @@
+{application, fmpush,
+ [
+   {description, "huawei push API by Erlang"},
+   {vsn, "1.0.0"},
+   {registered, []},
+   {applications, [
+     kernel,stdlib,jsx,ssl,crypto
+                  ]},
+   {mod, {fmpush_app, []}},
+   {modules, []},
+   {env, []}
+ ]}.
