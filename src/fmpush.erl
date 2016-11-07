@@ -60,9 +60,26 @@
 }.
 -export_type([connection/0]).
 
+
 %% <<"code">>|<<"data">>|<<"description">>|<<"info">>|<<"result">>|<<"trace_id">>
 -type result() :: #{binary() => any()}.
 -export_type([result/0]).
+
+
+merge_connection(Connection) ->
+  Default = #{host => "api-push.meizu.com",
+    name => undefined,
+    port => 443,
+    appid => "10679334",
+    app_secret => "a8aafcd266d477ba0c03cab9210f5e30",
+    ssl_opts => [{nodelay, true}, {reuseaddr, true}],
+    timeout =>  30000, %% ms
+    expires => 300, %% s
+    expires_conn => 0,
+    socket => undefined,
+    err_callback => fun(T) -> io:format("~p~n", [T]) end
+  },
+  maps:merge(Default, Connection).
 
 -spec connect(connection()) -> {ok, pid()} | {error, {already_started, pid()}} | {error, Reason::term()}.
 connect(Connection = #{})  ->
@@ -77,16 +94,9 @@ disconnect(ConnId) -> fmpush_connection:stop(ConnId).
 
 %% @doc 向某个regid或一组regid列表推送某条消息
 -spec push_to_regid(pid(), list(), push_msg(), return|no_return)-> ok|result().
-push_to_regid(ConnID, Token, PushMsg, ReturnType) ->
-  NewPushMsg = case maps:get(pass_through, PushMsg, undefined) of
-        1 ->
-			maps:merge(?SINGLE_ARGS#{<<"deviceToken">> => Token}, maps:remove(pass_through, PushMsg));
-        0 ->
-         #{title := Title, description := Content} = PushMsg,
-         AndroidMsg = jiffy:encode(#{<<"notification_title">> => Title, <<"notification_content">> => Content, <<"doings">> => 1}),
-         maps:merge(?NOTIFICATION_ARGS#{tokens => Token, <<"android">> => AndroidMsg}, maps:without([pass_through, title, description], PushMsg))
-  end,  
-  Result = fmpush_connection:send_message(ConnID, NewPushMsg, ReturnType),
+push_to_regid(ConnID, Token, PushMsg, PushType) ->
+  NewPushMsg = #{<<"pushIds">> => Token, <<"messageJson">> => PushMsg},
+  Result = fmpush_connection:send_message(ConnID, NewPushMsg, PushType),
   simplify_to_result(Result).
 
 %% @doc 自1970年来的UTC毫秒数(国际时间:不是local_time:local_time中国区比universal_time快8小时)
@@ -100,20 +110,6 @@ milliseconds_utc_since_1970({{_Year, _Month, _Day}, {_Hour, _Min, _Sec}} = Time)
 %% INTERNAL FUNCTION
 %% ===================================================================
 
-merge_connection(Connection) ->
-  Default = #{host => "api.vmall.com",
-    name => undefined,
-    port => 443,
-    appid => "10679334",
-    app_secret => "a8aafcd266d477ba0c03cab9210f5e30",
-    ssl_opts => [{nodelay, true}, {reuseaddr, true}],
-    timeout =>  30000, %% ms
-    expires => 300, %% s
-    expires_conn => 0,
-    socket => undefined,
-    err_callback => fun(T) -> io:format("~p~n", [T]) end
-  },
-  maps:merge(Default, Connection).
 
 %% EXCEPT 差集 INTERSECTION 交集 UNION 并集
 check_topic(Topics, OP)when OP == "UNION" orelse OP == "INTERSECTION" orelse OP == "EXCEPT" ->
